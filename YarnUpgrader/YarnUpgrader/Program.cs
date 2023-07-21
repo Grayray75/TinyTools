@@ -11,9 +11,9 @@ namespace YarnUpgrader
         static void Main(string[] args)
         {
 #if DEBUG
-            if (args.Length < 0)
+            if (args.Length == 0)
             {
-                args = new[] { "1.8.9.tiny-old.txt", "1.8.9.tiny-new.txt", "./mappings-old", "./mappings-new" };
+                args = new[] { "./legacy_old_1.8.9.tiny", "./legacy_1.8.9.tiny", "./mappings-old", "./mappings-new" };
             }
 #endif
 
@@ -21,23 +21,46 @@ namespace YarnUpgrader
             {
                 Console.WriteLine("Invalid args, usage: <old_tiny> <new_tiny> <old_mapping_dir> <new_mapping_dir>");
             }
+
             Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Input paths:");
+            Console.ForegroundColor = ConsoleColor.White;
+            Console.WriteLine($"Old intermediary file: {args[0]}");
+            Console.WriteLine($"New intermediary file: {args[1]}");
+            Console.WriteLine($"Old mapping directory: {args[2]}");
+            Console.WriteLine($"New mapping directory: {args[3]}");
 
-            Stopwatch watch = new Stopwatch();
+            Stopwatch stopwatch = new Stopwatch();
 
+            #region Read input files
+
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine("Reading old tiny file...");
+            Console.ForegroundColor = ConsoleColor.White;
             TinyFile oldTiny = new TinyParser().Parse(args[0]);
-            Console.WriteLine();
 
-            Console.WriteLine("Reading new tiny file...");
-            TinyFile newTiny = new TinyParser().Parse(args[1]);
             Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Reading new tiny file...");
+            Console.ForegroundColor = ConsoleColor.White;
+            TinyFile newTiny = new TinyParser().Parse(args[1]);
 
             string oldMapsDir = Path.GetFullPath(args[2]);
             string newMapsDir = Path.GetFullPath(args[3]);
             Directory.CreateDirectory(newMapsDir);
 
-            Console.WriteLine("Generating changes maps...");
+            #endregion
+
+            #region Calculate intermediary changes
+
+            stopwatch.Restart();
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Calculating intermediary changes...");
+            Console.ForegroundColor = ConsoleColor.White;
+
             Dictionary<string, string> classChanges = new Dictionary<string, string>();
             Dictionary<string, string> innerClassChanges = new Dictionary<string, string>();
             Dictionary<string, string> fieldChanges = new Dictionary<string, string>();
@@ -82,17 +105,28 @@ namespace YarnUpgrader
                 }
             }
 
+            stopwatch.Stop();
             Console.WriteLine();
-            Console.WriteLine("Mapped {0} class changes", classChanges.Count);
-            Console.WriteLine("Mapped {0} field changes", fieldChanges.Count);
-            Console.WriteLine("Mapped {0} method changes", methodChanges.Count);
+            Console.WriteLine("Found {0} class changes", classChanges.Count);
+            Console.WriteLine("Found {0} field changes", fieldChanges.Count);
+            Console.WriteLine("Found {0} method changes", methodChanges.Count);
             Console.WriteLine();
+            Console.WriteLine("Finished, took {0} ms", stopwatch.ElapsedMilliseconds);
 
-            Console.WriteLine("Writting change map files...");
-            Directory.CreateDirectory("./out");
+            #endregion
+
+            #region Save intermediary changes
+
+            Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Writting intermediary changes to file...");
+            Console.ForegroundColor = ConsoleColor.White;
+
+            Directory.CreateDirectory("./changes");
             List<string> classChangesFile = new List<string>();
             List<string> fieldChangesFile = new List<string>();
             List<string> methodChangesFile = new List<string>();
+
             foreach (var (key, val) in classChanges)
             {
                 classChangesFile.Add($"{key}\t=>\t{val}");
@@ -105,14 +139,21 @@ namespace YarnUpgrader
             {
                 methodChangesFile.Add($"{key}\t=>\t{val}");
             }
-            File.WriteAllLines(Path.Combine("./out", "classChanges.txt"), classChangesFile);
-            File.WriteAllLines(Path.Combine("./out", "fieldChanges.txt"), fieldChangesFile);
-            File.WriteAllLines(Path.Combine("./out", "methodChanges.txt"), methodChangesFile);
-            Console.WriteLine();
 
-            Console.WriteLine("Reading old mappings...");
-            watch.Restart();
+            File.WriteAllLines(Path.Combine("./changes", "class_changes.txt"), classChangesFile);
+            File.WriteAllLines(Path.Combine("./changes", "field_changes.txt"), fieldChangesFile);
+            File.WriteAllLines(Path.Combine("./changes", "method_changes.txt"), methodChangesFile);
+            Console.WriteLine("Finished, change file can be found at ./changes");
+
+            #endregion
+
+            #region Upgrade yarn mappings
+
+            stopwatch.Restart();
             Console.WriteLine();
+            Console.ForegroundColor = ConsoleColor.Cyan;
+            Console.WriteLine("Upgrading yarn mappings...");
+            Console.ForegroundColor = ConsoleColor.White;
 
             string[] mapFiles = Directory.GetFiles(oldMapsDir, "*.mapping", SearchOption.AllDirectories);
             int counter = 0;
@@ -125,7 +166,7 @@ namespace YarnUpgrader
                 string[] fileContent = File.ReadAllLines(filePath);
                 for (int i = 0; i < fileContent.Length; i++)
                 {
-                    var lineSplit = fileContent[i].Split(new[] { ' ', ';', 'L' });
+                    string[] lineSplit = fileContent[i].Split(new[] { ' ', ';', 'L' });
 
                     for (int k = 0; k < lineSplit.Length; k++)
                     {
@@ -151,16 +192,16 @@ namespace YarnUpgrader
                 string relPath = Path.GetRelativePath(oldMapsDir, filePath);
                 string newPath = Path.Combine(newMapsDir, relPath);
                 Directory.CreateDirectory(Path.GetDirectoryName(newPath));
-                //File.WriteAllLines(newPath, fileContent);
                 File.WriteAllText(newPath, String.Join("\n", fileContent) + "\n"); // Use only LF endings
             }
 
-            watch.Stop();
+            stopwatch.Stop();
             Console.WriteLine();
-            Console.WriteLine($"Took: {watch.ElapsedMilliseconds}ms");
-            Console.WriteLine();
-            Console.WriteLine("Finished!");
+            Console.WriteLine("Finished, took: {0} ms", stopwatch.ElapsedMilliseconds);
 
+            #endregion
+
+            Console.WriteLine();
             Console.ReadLine();
         }
     }

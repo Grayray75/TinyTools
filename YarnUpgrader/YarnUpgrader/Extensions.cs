@@ -34,29 +34,5 @@ namespace YarnUpgrader
             }
             return false;
         }
-
-        public static bool IsDigitsOnly(this string str)
-        {
-            foreach (char c in str)
-            {
-                if (c < '0' || c > '9')
-                    return false;
-            }
-
-            return true;
-        }
-
-        public static int CountChar(this string str, char c)
-        {
-            return str.Split(c).Length - 1;
-        }
-        public static int CountChars(this string str, params char[] chars)
-        {
-            return str.Split(chars).Length - 1;
-        }
-        public static int CountPattern(this string str, string pattern)
-        {
-            return str.Split(pattern).Length - 1;
-        }
     }
 }

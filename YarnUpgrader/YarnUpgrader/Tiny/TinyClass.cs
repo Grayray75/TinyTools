@@ -57,7 +57,6 @@ namespace YarnUpgrader.Tiny
             }
         }
 
-
         public override string ToString()
         {
             return $"{TinyType.CLASS} {this.FullOffical} {this.FullIntermediary}";
